@@ -1,0 +1,3 @@
+#include "resource.h"
+
+IDR_HORSE_PNG RCDATA "Assets\\horse.png"

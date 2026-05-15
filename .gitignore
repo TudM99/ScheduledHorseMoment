@@ -1,0 +1,27 @@
+# Build output
+x64/
+Debug/
+Release/
+*.exe
+*.obj
+*.pdb
+*.iobj
+*.ipdb
+*.res
+*.aps
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+
+# Intermediate/generated
+Schedule.e36faf57/
+*.log
+*.recipe
+*.FileListAbsolute.txt
+*.idb
