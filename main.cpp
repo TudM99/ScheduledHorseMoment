@@ -13,15 +13,12 @@
 
 using namespace Gdiplus;
 
-// ============================================================================
-// Constants
-// ============================================================================
 namespace Config {
     constexpr int WIN_W = 920;
     constexpr int WIN_H = 520;
     constexpr int TITLE_H = 28;
 
-    constexpr ULONGLONG LOCK_DURATION_MS = 120000;  // 2 minutes
+    constexpr ULONGLONG LOCK_DURATION_MS = 120000;
     constexpr int TIMER_INTERVAL_MS = 250;
 
     constexpr int BUTTON_SIZE = 22;
@@ -42,9 +39,6 @@ enum class ControlId : int {
     TimerAutoClose = 1
 };
 
-// ============================================================================
-// RAII Wrappers
-// ============================================================================
 class GdiObjectGuard {
     HGDIOBJ obj;
 public:
@@ -61,9 +55,6 @@ struct BitmapDeleter {
 };
 using BitmapPtr = std::unique_ptr<Bitmap, BitmapDeleter>;
 
-// ============================================================================
-// Global State
-// ============================================================================
 static ULONGLONG g_unlockAt = 0;
 static ULONG_PTR g_gdiplusToken = 0;
 
@@ -81,9 +72,6 @@ static HWND g_lblMiddle = nullptr;
 static HWND g_lblBottom = nullptr;
 static HWND g_hwndHorseView = nullptr;
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
 static HFONT CreateOldStyleFont(int heightPx, bool bold = false)
 {
     static constexpr std::array<const wchar_t*, 4> candidates = {
@@ -109,9 +97,7 @@ static HFONT CreateOldStyleFont(int heightPx, bool bold = false)
 static void ApplyFont(HWND hwnd, HFONT font)
 {
     if (hwnd && font)
-    {
         SendMessageW(hwnd, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-    }
 }
 
 static BitmapPtr LoadPngFromResource(HINSTANCE hInst)
@@ -128,7 +114,6 @@ static BitmapPtr LoadPngFromResource(HINSTANCE hInst)
     void* pData = LockResource(hGlob);
     if (!pData) return nullptr;
 
-    // Copy to moveable HGLOBAL for IStream
     HGLOBAL hCopy = GlobalAlloc(GMEM_MOVEABLE, size);
     if (!hCopy) return nullptr;
 
@@ -184,9 +169,6 @@ static void DrawClassicFrame(HDC hdc, RECT rc)
     DrawEdge(hdc, &inner, EDGE_SUNKEN, BF_RECT);
 }
 
-// ============================================================================
-// Horse View Window (displays the PNG)
-// ============================================================================
 static LRESULT CALLBACK HorseViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
@@ -216,7 +198,6 @@ static LRESULT CALLBACK HorseViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
             UINT imgW = g_horse->GetWidth();
             UINT imgH = g_horse->GetHeight();
 
-            // Preserve aspect ratio
             double scaleX = static_cast<double>(boxW) / static_cast<double>(imgW);
             double scaleY = static_cast<double>(boxH) / static_cast<double>(imgH);
             double scale = (scaleX < scaleY) ? scaleX : scaleY;
@@ -238,15 +219,11 @@ static LRESULT CALLBACK HorseViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
     return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
-// ============================================================================
-// Title Bar Window
-// ============================================================================
 static LRESULT CALLBACK TitleBarProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
     {
     case WM_LBUTTONDOWN:
-        // Enable dragging the parent window
         ReleaseCapture();
         SendMessageW(GetParent(hwnd), WM_NCLBUTTONDOWN, HTCAPTION, 0);
         return 0;
@@ -278,11 +255,9 @@ static LRESULT CALLBACK TitleBarProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
         RECT rc;
         GetClientRect(hwnd, &rc);
 
-        // Draw blue title bar background
         GdiObjectGuard blueBrush(CreateSolidBrush(RGB(0, 0, 128)));
         FillRect(hdc, &rc, static_cast<HBRUSH>(blueBrush.get()));
 
-        // Draw title text
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, RGB(255, 255, 255));
 
@@ -303,12 +278,8 @@ static LRESULT CALLBACK TitleBarProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
     return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
-// ============================================================================
-// UI Creation
-// ============================================================================
 static bool CreateUI(HWND hwnd, HINSTANCE hInst)
 {
-    // Title bar
     g_hwndTitle = CreateWindowExW(
         0, L"SHM_TITLEBAR", L"",
         WS_CHILD | WS_VISIBLE,
@@ -317,7 +288,6 @@ static bool CreateUI(HWND hwnd, HINSTANCE hInst)
     );
     if (!g_hwndTitle) return false;
 
-    // Help button (child of title bar)
     g_btnHelp = CreateWindowExW(
         0, L"BUTTON", L"?",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
@@ -329,7 +299,6 @@ static bool CreateUI(HWND hwnd, HINSTANCE hInst)
     );
     if (!g_btnHelp) return false;
 
-    // Close button (child of title bar)
     g_btnClose = CreateWindowExW(
         0, L"BUTTON", L"X",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
@@ -341,14 +310,12 @@ static bool CreateUI(HWND hwnd, HINSTANCE hInst)
     );
     if (!g_btnClose) return false;
 
-    // Disable modern theming for classic look
     SetWindowTheme(g_btnHelp, L"", L"");
     SetWindowTheme(g_btnClose, L"", L"");
 
     ApplyFont(g_btnHelp, g_fontTitle);
     ApplyFont(g_btnClose, g_fontTitle);
 
-    // Static text labels
     g_lblHeader = CreateWindowW(L"STATIC",
         L"Please stand by for a scheduled Horse\r\nMoment.",
         WS_CHILD | WS_VISIBLE,
@@ -374,7 +341,6 @@ static bool CreateUI(HWND hwnd, HINSTANCE hInst)
     ApplyFont(g_lblMiddle, g_fontText);
     ApplyFont(g_lblBottom, g_fontText);
 
-    // Horse image view
     g_hwndHorseView = CreateWindowExW(
         0, L"SHM_HORSEVIEW", L"",
         WS_CHILD | WS_VISIBLE,
@@ -386,9 +352,6 @@ static bool CreateUI(HWND hwnd, HINSTANCE hInst)
     return true;
 }
 
-// ============================================================================
-// Main Window Procedure
-// ============================================================================
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
@@ -397,10 +360,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     {
         MakeTopMost(hwnd);
 
-        // Set unlock time (2 minutes from now)
         g_unlockAt = GetTickCount64() + Config::LOCK_DURATION_MS;
 
-        // Auto-close timer
         SetTimer(hwnd, static_cast<UINT_PTR>(ControlId::TimerAutoClose),
             Config::TIMER_INTERVAL_MS, nullptr);
 
@@ -462,7 +423,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     }
 
     case WM_DESTROY:
-        // Clean up resources
         g_horse.reset();
 
         if (g_fontText)
@@ -493,9 +453,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
-// ============================================================================
-// Window Class Registration
-// ============================================================================
 static bool RegisterWindowClasses(HINSTANCE hInst)
 {
     WNDCLASSW wcMain{};
@@ -522,12 +479,8 @@ static bool RegisterWindowClasses(HINSTANCE hInst)
     return true;
 }
 
-// ============================================================================
-// Entry Point
-// ============================================================================
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow)
 {
-    // Initialize GDI+
     GdiplusStartupInput startupInput;
     if (GdiplusStartup(&g_gdiplusToken, &startupInput, nullptr) != Ok)
     {
@@ -536,16 +489,12 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow)
         return 1;
     }
 
-    // Create resources
     g_brGray = CreateSolidBrush(RGB(192, 192, 192));
     g_fontText = CreateOldStyleFont(Config::FONT_TEXT_SIZE, false);
     g_fontTitle = CreateOldStyleFont(Config::FONT_TITLE_SIZE, true);
 
-    // Load the horse image
     g_horse = LoadPngFromResource(hInst);
-    
 
-    // Register window classes
     if (!RegisterWindowClasses(hInst))
     {
         MessageBoxW(nullptr, L"Failed to register window classes", L"Error",
@@ -554,7 +503,6 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow)
         return 1;
     }
 
-    // Create main window (borderless popup)
     HWND hwnd = CreateWindowExW(
         0,
         L"SHM_MAIN",
@@ -576,7 +524,6 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow)
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
 
-    // Message loop
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0))
     {
